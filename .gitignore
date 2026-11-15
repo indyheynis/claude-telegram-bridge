@@ -1,0 +1,10 @@
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+
+# Geheimen en logboeken horen nooit in git
+.env
+*.log
+spike/logs/
+spike/rewake_armed.json

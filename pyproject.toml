@@ -1,0 +1,17 @@
+[project]
+name = "claude-telegram-bridge"
+version = "1.0.0"
+description = "Get notified on Telegram when Claude Code (Desktop, Windows) needs you, and answer from your phone. Built on official Claude Code hooks."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Indy Heynis" }]
+requires-python = ">=3.10"
+keywords = ["claude-code", "telegram", "telegram-bot", "hooks", "notifications", "windows"]
+dependencies = [
+    "python-telegram-bot>=22.8",
+    "telegramify-markdown>=0.5.4,<1",
+]
+
+[project.urls]
+Documentation = "https://code.claude.com/docs/en/hooks"
