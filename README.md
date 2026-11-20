@@ -21,6 +21,7 @@ no cloud server: a small Python program on your own PC and a Telegram bot.
 - **Continue from Telegram:** reply to a "done" message and the idle chat wakes up and carries on.
 - **One Telegram topic per Claude chat**, named after the chat, so replies always reach the right one.
 - **Home / away switch:** `/home` = no notifications, `/away` = everything comes to your phone, including what was already waiting.
+  Works in Telegram (one tap via the menu button) **and in any Claude chat**, at zero Claude usage.
 - **`/status`** overview and **reminders** after 30 minutes.
 - **Answer wherever you are:** whoever answers first (computer or phone) wins; the Telegram message updates itself.
 - **Safe by design:** only your Telegram account is accepted, the bot token never leaves your PC or its log, and if the bridge is down Claude simply behaves as normal.
@@ -34,7 +35,7 @@ Claude Code (your PC)  <->  hook.py  <->  bridge.py  <->  Telegram Bot API  <-> 
 ```
 
 1. **`hook.py`** is started by Claude Code at fixed moments (official hook events:
-   `PermissionRequest`, `Stop`, `StopFailure`, `UserPromptSubmit`, `PostToolUse`,
+   `PermissionRequest`, `Stop`, `StopFailure`, `UserPromptSubmit`, `UserPromptExpansion`, `PostToolUse`,
    `PostToolUseFailure`, `SessionEnd`).
 2. **`bridge.py`** runs in the background. It has a local endpoint on `127.0.0.1:8765`
    (protected by a shared secret) and talks to Telegram via long polling, so no open ports are needed.
@@ -64,7 +65,8 @@ Claude Code (your PC)  <->  hook.py  <->  bridge.py  <->  Telegram Bot API  <-> 
    powershell -ExecutionPolicy Bypass -File autostart.ps1
    Start-ScheduledTask -TaskName "Claude Telegram Bridge"
    ```
-7. **Install the hooks** into `~/.claude/settings.json` (a backup is made first):
+7. **Install the hooks** into `~/.claude/settings.json` (a backup is made first) and the `/away` + `/home`
+   commands into `~/.claude/commands`:
    ```powershell
    uv run python install.py
    ```
@@ -79,6 +81,10 @@ Claude Code (your PC)  <->  hook.py  <->  bridge.py  <->  Telegram Bot API  <-> 
 | `/status` | What is waiting for you, and the current switch position. |
 | Tap a button | Answer a question, allow/deny, or pick the next step. |
 | Type a message | Your own answer. Inside a topic it always goes to that Claude chat. |
+
+**From the Claude app:** type `/away` or `/home` in any Claude chat (`/weg` and `/thuis` with `BRIDGE_LANGUAGE=nl`).
+A `UserPromptExpansion` hook flips the switch and stops the command before it reaches Claude, so it costs
+no Claude usage. You see a short confirmation in the app and in Telegram.
 
 ## Configuration
 
@@ -167,7 +173,7 @@ Markdown is converted with [telegramify-markdown](https://github.com/sudoskys/te
 | `hook.py` | Hook script started by Claude Code (standard library only) |
 | `messages.py` | All bot texts, English and Dutch |
 | `formatting.py` | Markdown → Telegram formatting |
-| `install.py` | Adds/removes the hooks in `~/.claude/settings.json` |
+| `install.py` | Adds/removes the hooks in `~/.claude/settings.json` and the switch commands in `~/.claude/commands` |
 | `autostart.ps1` | Windows Task Scheduler task + watchdog |
 | `spike/` | The experiment that proved the approach |
 

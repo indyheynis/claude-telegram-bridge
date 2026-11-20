@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from telegram import (
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     LinkPreviewOptions,
@@ -39,7 +40,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, NetworkError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -50,7 +51,7 @@ from telegram.ext import (
 )
 
 import formatting as fmt
-from messages import Messages
+from messages import Messages, mode_for_command
 
 CONFIG_DIR = pathlib.Path(os.environ.get("CLAUDE_TELEGRAM_DIR", pathlib.Path.home() / ".claude-telegram"))
 ENV_FILE = CONFIG_DIR / ".env"
@@ -351,6 +352,20 @@ class Bridge:
         wait_s = float(data.get("_wait_s") or 0)
         t = self.t
 
+        if event == "UserPromptExpansion":  # /weg or /thuis typed in a Claude chat
+            mode = mode_for_command(data.get("command_name") or data.get("prompt"))
+            if not mode:
+                return {"action": "none"}
+            self.set_mode(mode)
+            waiting = len([i for i in self.pending_sorted() if not i.sent])
+            self.spawn(self.announce_switch(mode))
+            reason = t("app_away", count=waiting) if mode == AWAY else t("app_home")
+            return {"action": "block", "reason": reason}
+
+        if event == "UserPromptSubmit" and (data.get("prompt") or "").strip().startswith("/") \
+                and mode_for_command(data.get("prompt")):
+            return {"action": "none"}  # only the switch was flipped; the chat did not continue
+
         if event in ("UserPromptSubmit", "SessionEnd"):
             if data.get("session_title"):
                 self.titles[sid] = data["session_title"]
@@ -498,6 +513,26 @@ class Bridge:
         return None
 
     # ---- Telegram: sending
+
+    async def announce_switch(self, mode: str, reply=None) -> None:
+        """Confirm a switch in Telegram; on away, also send everything that was already waiting.
+
+        reply: reply function of a Telegram command, or None when the switch came from the Claude app.
+        """
+        waiting = [i for i in self.pending_sorted() if not i.sent] if mode == AWAY else []
+        if mode == AWAY:
+            text = self.t("away_waiting", count=len(waiting)) if waiting else self.t("away_nothing")
+        else:
+            text = self.t("home")
+        try:
+            if reply:
+                await reply(text)
+            else:
+                await self.send_plain(self.t("from_app") + text)
+            for item in waiting:
+                await self.send_item(item)
+        except Exception as exc:
+            log.warning("Could not confirm the switch in Telegram: %s", type(exc).__name__)
 
     async def send_plain(self, text: str, reply_to: int | None = None, thread: int | None = None) -> None:
         await self.app.bot.send_message(
@@ -677,6 +712,16 @@ def build_app(settings: Settings, server: ThreadingHTTPServer) -> tuple[Applicat
         topics = await bridge.topics_enabled()
         log.info("Connected to Telegram as @%s, counter on 127.0.0.1:%s, topics %s",
                  me.username, server.server_address[1], "on" if topics else "off")
+        try:  # the menu button in the bot chat: one tap instead of typing
+            nl = settings.language == "nl"
+            await app.bot.set_my_commands([
+                BotCommand("weg" if nl else "away", bridge.t("menu_away")),
+                BotCommand("thuis" if nl else "home", bridge.t("menu_home")),
+                BotCommand("status", bridge.t("menu_status")),
+                BotCommand("help", bridge.t("menu_help")),
+            ])
+        except Exception as exc:
+            log.warning("Could not set the command menu (%s)", type(exc).__name__)
         try:
             await bridge.send_plain(bridge.t("started", mode=bridge.mode_text()))
         except Exception as exc:
@@ -692,17 +737,11 @@ def build_app(settings: Settings, server: ThreadingHTTPServer) -> tuple[Applicat
 
     async def cmd_away(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         bridge.set_mode(AWAY)
-        waiting = [i for i in bridge.pending_sorted() if not i.sent]
-        if waiting:
-            await update.effective_message.reply_text(t("away_waiting", count=len(waiting)))
-            for item in waiting:
-                await bridge.send_item(item)
-        else:
-            await update.effective_message.reply_text(t("away_nothing"))
+        await bridge.announce_switch(AWAY, reply=update.effective_message.reply_text)
 
     async def cmd_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         bridge.set_mode(HOME)
-        await update.effective_message.reply_text(t("home"))
+        await bridge.announce_switch(HOME, reply=update.effective_message.reply_text)
 
     async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         items = bridge.pending_sorted()
@@ -814,7 +853,15 @@ def build_app(settings: Settings, server: ThreadingHTTPServer) -> tuple[Applicat
     app.add_handler(CommandHandler("status", cmd_status, filters=only_owner))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(only_owner & filters.TEXT & ~filters.COMMAND, on_text))
+    async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        err = context.error
+        if isinstance(err, NetworkError):  # internet hiccup: the bot retries by itself
+            log.warning("Telegram connection problem (%s), retrying automatically", type(err).__name__)
+        else:
+            log.error("Error while handling a Telegram update", exc_info=err)
+
     app.add_handler(MessageHandler(~only_owner, ignore_stranger))
+    app.add_error_handler(on_error)
     return app, bridge
 
 

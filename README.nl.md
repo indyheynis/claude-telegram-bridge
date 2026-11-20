@@ -21,6 +21,12 @@ geen server in de cloud: een klein Python-programma op je eigen pc en een Telegr
 | Knop tikken | Antwoord op een vraag, toestemming geven/weigeren, of de keuze onder "Claude is klaar". |
 | Zelf typen | Je eigen antwoord. In een draadje gaat het altijd naar die ene Claude-chat. |
 
+Linksonder in je botchat zit een **menuknop** met deze commando's, dan hoef je niets te typen.
+
+**Vanuit de Claude-app:** typ `/weg` of `/thuis` in een willekeurige Claude-chat. Een haakje
+(`UserPromptExpansion`) zet de schakelaar om en houdt het commando tegen voordat Claude het ziet,
+dus het kost geen Claude-gebruik. Je ziet een korte bevestiging in de app en in Telegram.
+
 Je krijgt een bericht als Claude:
 
 - **toestemming vraagt** (✅ Toestaan / ❌ Weigeren, of typ een uitleg om te weigeren);
@@ -39,7 +45,8 @@ Claude (op je pc)  <->  haakje (hook.py)  <->  postbode (bridge.py)  <->  Telegr
 ```
 
 1. **Het haakje** (`hook.py`) wordt door Claude Code zelf gestart op vaste momenten (officiële hooks:
-   `PermissionRequest`, `Stop`, `StopFailure`, `UserPromptSubmit`, `PostToolUse`, `PostToolUseFailure`, `SessionEnd`).
+   `PermissionRequest`, `Stop`, `StopFailure`, `UserPromptSubmit`, `UserPromptExpansion`, `PostToolUse`,
+   `PostToolUseFailure`, `SessionEnd`).
 2. **De postbode** (`bridge.py`) draait altijd op de achtergrond. Hij heeft een "loket" dat alleen op je eigen
    pc bereikbaar is (`127.0.0.1:8765`, met geheim wachtwoord) en praat met Telegram.
 3. Het haakje geeft het moment door aan het loket en wacht (maximaal 8 uur) op jouw antwoord.
@@ -60,7 +67,7 @@ Nodig: Windows, Claude Desktop met Claude Code, [uv](https://docs.astral.sh/uv/)
 5. **Code klaarzetten:** in deze map `uv sync`
 6. **Postbode automatisch laten starten:** `powershell -ExecutionPolicy Bypass -File autostart.ps1`
    en daarna één keer starten: `Start-ScheduledTask -TaskName "Claude Telegram Bridge"`
-7. **Haakjes installeren:** `uv run python install.py`
+7. **Haakjes installeren:** `uv run python install.py` (zet ook `/weg` en `/thuis` klaar in `~/.claude/commands`)
 8. **Testen:** druk op **Start** bij je bot, stuur `/status`, dan `/weg`, en laat Claude iets vragen.
 
 ## Instellingen en bestanden

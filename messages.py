@@ -5,6 +5,16 @@ Pick the language with BRIDGE_LANGUAGE=en|nl in ~/.claude-telegram/.env (default
 """
 from __future__ import annotations
 
+# Slash commands that flip the home/away switch (Telegram and the Claude app), mapped to the internal mode.
+MODE_COMMANDS = {"away": "weg", "weg": "weg", "home": "thuis", "thuis": "thuis"}
+
+
+def mode_for_command(name: str | None) -> str | None:
+    """'/weg', 'weg' or 'plugin:weg' -> 'weg'; anything else -> None."""
+    name = (name or "").strip().lstrip("/").split(":")[-1].strip().lower()
+    return MODE_COMMANDS.get(name)
+
+
 TEXTS: dict[str, dict[str, str]] = {
     "en": {
         "owner_default": "the user",
@@ -21,6 +31,14 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "away_waiting": "🚶 Away mode on. {count} thing(s) waiting for you, sending them now.",
         "away_nothing": "🚶 Away mode on. Nothing is waiting for you; I'll let you know when something is.",
+        "app_away": "Telegram bridge: away. Notifications now go to your phone ({count} waiting).",
+        "app_home": "Telegram bridge: home. No more notifications.",
+        "from_app": "💻 Switched from the Claude app.\n",
+        "bridge_down": "The Telegram bridge is not running, so the switch did not change. It restarts within 3 minutes; try again then.",
+        "menu_away": "Notifications on (you're leaving)",
+        "menu_home": "Notifications off (you're at your computer)",
+        "menu_status": "What is waiting for you?",
+        "menu_help": "Help",
         "home": "🏠 Home mode: no more notifications. Messages that are still open can still be answered.",
         "status_switch": "Switch: {mode}",
         "status_topics": "Topic per chat: {state}",
@@ -99,6 +117,14 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "away_waiting": "🚶 Weg-modus aan. Er wacht(en) nu {count} ding(en) op je, die stuur ik je nu.",
         "away_nothing": "🚶 Weg-modus aan. Er wacht nu niets op je; ik meld me zodra dat wel zo is.",
+        "app_away": "Telegram-postbode: weg. Meldingen gaan nu naar je telefoon ({count} wachtend).",
+        "app_home": "Telegram-postbode: thuis. Geen meldingen meer.",
+        "from_app": "💻 Omgezet vanuit de Claude-app.\n",
+        "bridge_down": "De Telegram-postbode draait niet, dus de schakelaar is niet omgezet. Hij start binnen 3 minuten vanzelf; probeer het dan opnieuw.",
+        "menu_away": "Meldingen aan (je gaat weg)",
+        "menu_home": "Meldingen uit (je zit achter de pc)",
+        "menu_status": "Wat wacht er op je?",
+        "menu_help": "Uitleg",
         "home": "🏠 Thuis-modus: je krijgt geen meldingen meer. Berichten die nog openstaan, kun je nog steeds beantwoorden.",
         "status_switch": "Schakelaar: {mode}",
         "status_topics": "Draadjes per chat: {state}",

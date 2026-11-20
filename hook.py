@@ -9,7 +9,9 @@ NOTHING (exit 0, no output). Claude then behaves exactly as without the bridge.
 Usage (by Claude Code, configured by install.py):
     python hook.py            -> only pass the event on, don't wait
     python hook.py --wait N   -> wait at most N seconds for an answer
-Standard library only, so it starts fast.
+    python hook.py --set-mode weg|thuis|away|home
+                              -> flip the home/away switch (fallback of the /weg and /thuis commands)
+Standard library only (plus messages.py from this folder), so it starts fast.
 """
 from __future__ import annotations
 
@@ -18,6 +20,8 @@ import os
 import pathlib
 import sys
 import urllib.request
+
+from messages import Messages, mode_for_command
 
 CONFIG_DIR = pathlib.Path(os.environ.get("CLAUDE_TELEGRAM_DIR", pathlib.Path.home() / ".claude-telegram"))
 BRIDGE_FILE = CONFIG_DIR / "bridge.json"
@@ -30,6 +34,17 @@ def wait_seconds() -> float:
         except (IndexError, ValueError):
             pass
     return 0.0
+
+
+def messages() -> Messages:
+    language = os.environ.get("BRIDGE_LANGUAGE", "")
+    try:
+        for line in (CONFIG_DIR / ".env").read_text(encoding="utf-8-sig").splitlines():
+            if line.strip().startswith("BRIDGE_LANGUAGE=") and not language:
+                language = line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return Messages(language.lower() or "en")
 
 
 def emit(obj: dict) -> None:
@@ -51,19 +66,39 @@ def ask_bridge(data: dict, wait_s: float) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def set_mode(name: str) -> int:
+    """Fallback for the /weg and /thuis command files: same as the hook, but prints plain text."""
+    try:
+        result = ask_bridge({"hook_event_name": "UserPromptExpansion", "command_name": name}, 0)
+        print(result.get("reason") or "?")
+    except Exception:
+        print(messages()("bridge_down"))
+    return 0
+
+
 def main() -> int:
+    if "--set-mode" in sys.argv:
+        return set_mode(sys.argv[-1])
     try:
         data = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
     except json.JSONDecodeError:
         return 0
     event = data.get("hook_event_name", "")
+    switch = event == "UserPromptExpansion" and mode_for_command(data.get("command_name"))
 
     try:
         result = ask_bridge(data, wait_seconds())
     except Exception:
+        if switch:  # our own /weg or /thuis: say so instead of sending it to Claude
+            emit({"decision": "block", "reason": messages()("bridge_down")})
         return 0  # bridge not running or not responding: do nothing
 
     action = result.get("action")
+
+    if switch:
+        if action == "block":  # switch flipped; the command never reaches Claude (costs nothing)
+            emit({"decision": "block", "reason": result.get("reason", "")})
+        return 0
 
     if event == "PermissionRequest":
         if action == "allow":
