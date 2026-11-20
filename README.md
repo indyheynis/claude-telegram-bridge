@@ -20,9 +20,10 @@ no cloud server: a small Python program on your own PC and a Telegram bot.
 - **"Claude is done"** with a formatted summary, plus the *next step* question from the Claude app as buttons.
 - **Continue from Telegram:** reply to a "done" message and the idle chat wakes up and carries on.
 - **One Telegram topic per Claude chat**, named after the chat, so replies always reach the right one.
-- **Home / away switch:** `/home` = no notifications, `/away` = everything comes to your phone, including what was already waiting.
+- **Home / away switch:** `/home` = no notifications, `/away` = everything comes to your phone, including questions that were already waiting.
   Works in Telegram (one tap via the menu button) **and in any Claude chat**, at zero Claude usage.
-- **`/status`** overview and **reminders** after 30 minutes.
+- **`/status`** overview and **reminders** after 30 minutes for open questions and permission requests
+  (a chat that is simply done is not open, so it never nags you).
 - **Answer wherever you are:** whoever answers first (computer or phone) wins; the Telegram message updates itself.
 - **Safe by design:** only your Telegram account is accepted, the bot token never leaves your PC or its log, and if the bridge is down Claude simply behaves as normal.
 - **Survives reboots:** starts at logon, with a watchdog that restarts it within 3 minutes.
@@ -76,7 +77,7 @@ Claude Code (your PC)  <->  hook.py  <->  bridge.py  <->  Telegram Bot API  <-> 
 
 | In Telegram | What happens |
 |---|---|
-| `/away` (or `/weg`) | Notifications on. Everything waiting for you is sent right away. |
+| `/away` (or `/weg`) | Notifications on. Questions and permission requests already waiting are sent right away. |
 | `/home` (or `/thuis`) | Notifications off, for when you're at your computer. |
 | `/status` | What is waiting for you, and the current switch position. |
 | Tap a button | Answer a question, allow/deny, or pick the next step. |

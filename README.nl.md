@@ -15,7 +15,7 @@ geen server in de cloud: een klein Python-programma op je eigen pc en een Telegr
 
 | In Telegram | Wat er gebeurt |
 |---|---|
-| `/weg` (of `/away`) | Meldingen aan. Alles wat op je wacht komt meteen naar je telefoon, ook wat al wachtte. |
+| `/weg` (of `/away`) | Meldingen aan. Vragen en toestemmingen die al op je wachtten, komen meteen naar je telefoon. |
 | `/thuis` (of `/home`) | Meldingen uit. Gebruik dit als je achter je pc zit. |
 | `/status` | Overzicht: welke Claude-chats wachten op je, en staat de schakelaar op thuis of weg. |
 | Knop tikken | Antwoord op een vraag, toestemming geven/weigeren, of de keuze onder "Claude is klaar". |
@@ -34,7 +34,8 @@ Je krijgt een bericht als Claude:
 - **klaar is** (samenvatting met opmaak + de keuzevraag uit de app als knoppen);
 - **vastloopt op een fout**.
 
-Wacht iets 30 minuten op je, dan krijg je een herinnering (maximaal 3 keer).
+Wacht een vraag of toestemming 30 minuten op je, dan krijg je een herinnering (maximaal 3 keer).
+Een chat die alleen klaar is, krijgt geen herinnering: daar staat niets open.
 Elke Claude-chat krijgt een **eigen draadje** in je botchat, met de naam van de chat erboven.
 Antwoord je op de pc, dan wordt het Telegram-bericht bijgewerkt ("✔️ Beantwoord op de pc").
 

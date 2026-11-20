@@ -60,7 +60,7 @@ STATE_FILE = CONFIG_DIR / "state.json"
 LOG_FILE = CONFIG_DIR / "logs" / "bridge.log"
 
 DEFAULT_PORT = 8765
-REMINDER_AFTER_S = 30 * 60  # remind when something has been waiting for 30 minutes
+REMINDER_AFTER_S = 30 * 60  # remind when a question/permission has been waiting for 30 minutes
 MAX_REMINDERS = 3
 SUMMARY_CHARS = 2500  # max length of the "done" summary in Telegram (before formatting)
 TRANSCRIPT_TAIL_BYTES = 3_000_000  # only read the last part of the transcript
@@ -268,6 +268,11 @@ class Item:
     finished: threading.Event = field(default_factory=threading.Event)
     result: dict | None = None
 
+    @property
+    def blocks_claude(self) -> bool:
+        """Claude is stuck until you answer (permission or question). A finished chat is not."""
+        return self.kind in ("permission", "question")
+
     def accepts_text(self) -> bool:
         return self.sent and (self.kind in ("done", "permission") or self.first_open_question() is not None)
 
@@ -357,7 +362,7 @@ class Bridge:
             if not mode:
                 return {"action": "none"}
             self.set_mode(mode)
-            waiting = len([i for i in self.pending_sorted() if not i.sent])
+            waiting = len(self.unsent_blocking())
             self.spawn(self.announce_switch(mode))
             reason = t("app_away", count=waiting) if mode == AWAY else t("app_home")
             return {"action": "block", "reason": reason}
@@ -519,7 +524,7 @@ class Bridge:
 
         reply: reply function of a Telegram command, or None when the switch came from the Claude app.
         """
-        waiting = [i for i in self.pending_sorted() if not i.sent] if mode == AWAY else []
+        waiting = self.unsent_blocking() if mode == AWAY else []
         if mode == AWAY:
             text = self.t("away_waiting", count=len(waiting)) if waiting else self.t("away_nothing")
         else:
@@ -640,6 +645,11 @@ class Bridge:
                     return item, item.question_msgs.get(message_id)
         return None, None
 
+    def unsent_blocking(self) -> list[Item]:
+        """Open questions/permissions not yet sent to Telegram. Chats that finished while you were
+        home are left out: you already saw those on the computer."""
+        return [i for i in self.pending_sorted() if not i.sent and i.blocks_claude]
+
     def pending_sorted(self) -> list[Item]:
         with self.lock:
             return sorted(self.items.values(), key=lambda i: i.created)
@@ -653,7 +663,8 @@ class Bridge:
                 continue
             now = time.time()
             for item in self.pending_sorted():
-                if item.sent and item.reminders < MAX_REMINDERS and now - item.last_ping >= REMINDER_AFTER_S:
+                if item.blocks_claude and item.sent and item.reminders < MAX_REMINDERS \
+                        and now - item.last_ping >= REMINDER_AFTER_S:
                     item.reminders += 1
                     item.last_ping = now
                     first_msg = min(item.texts) if item.texts else None
